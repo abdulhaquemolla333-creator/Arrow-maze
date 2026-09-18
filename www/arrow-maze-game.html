@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Arrow Maze - অ্যারো মেজ</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --panel:#ffffff; --primary:#2f6bff; --primary-dark:#1d4fd6;
+    --text:#1c2230; --muted:#8a93a6; --danger:#ff4d5e; --success:#22c07a;
+    --heart:#ff4d5e; --heart-off:#e3e6ee;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{height:100%; margin:0; background:var(--bg); font-family:'Segoe UI',Arial,sans-serif; color:var(--text); overflow:hidden;}
+  #app{position:relative; height:100%; width:100%; max-width:520px; margin:0 auto; background:var(--bg); display:flex; flex-direction:column;}
+  .screen{position:absolute; inset:0; display:flex; flex-direction:column; opacity:1; transition:opacity .2s;}
+  .screen.hidden{display:none;}
+
+  /* ---------- MENU ---------- */
+  #screen-menu{align-items:center; justify-content:center; text-align:center; padding:24px; gap:14px;}
+  #screen-menu h1{font-size:2.1em; margin:0 0 2px; color:var(--primary-dark);}
+  #screen-menu .logo{font-size:3.2em;}
+  #screen-menu p{color:var(--muted); margin:0 0 18px;}
+  .btn{
+    display:block; width:240px; padding:14px 18px; border:none; border-radius:14px;
+    font-size:1.05em; font-weight:600; cursor:pointer; margin:6px 0; transition:transform .1s;
+  }
+  .btn:active{transform:scale(.96);}
+  .btn-primary{background:var(--primary); color:#fff; box-shadow:0 6px 14px rgba(47,107,255,.35);}
+  .btn-secondary{background:var(--panel); color:var(--primary-dark); border:2px solid var(--primary);}
+  .btn-ghost{background:none; color:var(--muted); font-weight:500; font-size:.9em; text-decoration:underline;}
+
+  /* ---------- LEVEL SELECT ---------- */
+  #screen-levels{padding:0;}
+  .top-bar{display:flex; align-items:center; gap:10px; padding:14px 16px; background:var(--panel); box-shadow:0 2px 6px rgba(0,0,0,.06); z-index:5;}
+  .top-bar h2{margin:0; font-size:1.15em; flex:1;}
+  .icon-btn{width:38px; height:38px; border-radius:10px; border:none; background:var(--bg); font-size:1.1em; cursor:pointer; display:flex; align-items:center; justify-content:center;}
+  .jump-row{display:flex; gap:8px; padding:10px 16px; background:var(--panel);}
+  .jump-row input{flex:1; padding:10px; border-radius:10px; border:1px solid #dfe3ee; font-size:1em; width:0;}
+  .jump-row button{padding:10px 16px; border-radius:10px; border:none; background:var(--primary); color:#fff; font-weight:600;}
+  #levels-grid{flex:1; overflow-y:auto; padding:12px; display:grid; grid-template-columns:repeat(5,1fr); gap:8px; align-content:start;}
+  .lvl-btn{
+    aspect-ratio:1/1; border-radius:12px; border:none; background:var(--panel); color:var(--text);
+    font-weight:700; font-size:.95em; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    box-shadow:0 2px 5px rgba(0,0,0,.08); position:relative;
+  }
+  .lvl-btn.locked{color:var(--muted); background:#eceff5; box-shadow:none;}
+  .lvl-btn .stars{font-size:.55em; color:#f5b400; letter-spacing:1px; margin-top:2px;}
+  .lvl-btn.current{outline:3px solid var(--primary);}
+
+  /* ---------- GAME ---------- */
+  #screen-game{align-items:center;}
+  .game-top{width:100%; display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--panel); box-shadow:0 2px 6px rgba(0,0,0,.06); z-index:5;}
+  .hearts{flex:1; display:flex; gap:4px; justify-content:center; font-size:1.3em;}
+  .heart{color:var(--heart-off); transition:transform .15s;}
+  .heart.on{color:var(--heart);}
+  .heart.lost{animation:pop .3s;}
+  @keyframes pop{0%{transform:scale(1.6);}100%{transform:scale(1);}}
+  .lvl-label{font-weight:700; font-size:1.05em; min-width:70px; text-align:center;}
+  .board-wrap{flex:1; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:10px;}
+  #board{
+    display:grid; gap:3px; touch-action:manipulation;
+    width:min(92vw, 440px); height:min(92vw, 440px);
+    background:#e7eaf3; border-radius:14px; padding:6px; box-shadow:inset 0 0 0 1px #dfe3ee;
+  }
+  .cell{position:relative; border-radius:6px; background:#fff;}
+  .cell.empty{background:transparent; box-shadow:none;}
+  .arrow{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-weight:900; color:#1c2230; font-size:1em; cursor:pointer; border-radius:6px;
+    background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.15);
+    transition:transform .25s ease, opacity .25s ease;
+  }
+  .arrow svg{width:60%; height:60%;}
+  .arrow.dir-up svg{transform:rotate(0deg);}
+  .arrow.dir-right svg{transform:rotate(90deg);}
+  .arrow.dir-down svg{transform:rotate(180deg);}
+  .arrow.dir-left svg{transform:rotate(-90deg);}
+  .arrow.shake{animation:shake .35s;}
+  @keyframes shake{
+    10%,90%{transform:translateX(-2px);}
+    20%,80%{transform:translateX(3px);}
+    30%,50%,70%{transform:translateX(-5px);}
+    40%,60%{transform:translateX(5px);}
+  }
+  .bottom-bar{width:100%; padding:10px 16px 18px; text-align:center; color:var(--muted); font-size:.85em;}
+
+  /* ---------- MODALS ---------- */
+  .modal-bg{position:absolute; inset:0; background:rgba(10,14,25,.55); display:flex; align-items:center; justify-content:center; z-index:20;}
+  .modal-bg.hidden{display:none;}
+  .modal{background:#fff; border-radius:20px; padding:28px 24px; width:82%; max-width:320px; text-align:center; box-shadow:0 20px 40px rgba(0,0,0,.25);}
+  .modal .big-icon{font-size:2.6em; margin-bottom:6px;}
+  .modal h2{margin:0 0 4px;}
+  .modal .stars-big{font-size:1.6em; color:#f5b400; letter-spacing:6px; margin:10px 0;}
+  .modal p{color:var(--muted); margin:4px 0 16px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- MENU -->
+  <div class="screen" id="screen-menu">
+    <div class="logo">➹</div>
+    <h1>Arrow Maze</h1>
+    <p>তীর সরিয়ে বোর্ড খালি করো — ১০০০ লেভেল!</p>
+    <button class="btn btn-primary" id="btn-continue">চালিয়ে যান (লেভেল <span id="continue-lvl">1</span>)</button>
+    <button class="btn btn-secondary" id="btn-levels">লেভেল নির্বাচন করুন</button>
+    <button class="btn btn-ghost" id="btn-reset">প্রগ্রেস রিসেট করুন</button>
+  </div>
+
+  <!-- LEVEL SELECT -->
+  <div class="screen hidden" id="screen-levels">
+    <div class="top-bar">
+      <button class="icon-btn" id="back-from-levels">←</button>
+      <h2>লেভেল নির্বাচন</h2>
+    </div>
+    <div class="jump-row">
+      <input type="number" id="jump-input" placeholder="লেভেল নাম্বার (1-1000)" min="1" max="1000">
+      <button id="jump-go">যাও</button>
+    </div>
+    <div id="levels-grid"></div>
+  </div>
+
+  <!-- GAME -->
+  <div class="screen hidden" id="screen-game">
+    <div class="game-top">
+      <button class="icon-btn" id="back-from-game">←</button>
+      <div class="lvl-label">লেভেল <span id="game-lvl-num">1</span></div>
+      <div class="hearts" id="hearts-box"></div>
+    </div>
+    <div class="board-wrap"><div id="board"></div></div>
+    <div class="bottom-bar">তীরের গায়ে টোকা দাও — বোর্ডের বাইরে যাওয়ার সরাসরি পথ থাকলে তীরটি সরে যাবে</div>
+  </div>
+
+  <!-- WIN MODAL -->
+  <div class="modal-bg hidden" id="modal-win">
+    <div class="modal">
+      <div class="big-icon">🎉</div>
+      <h2>লেভেল সম্পন্ন!</h2>
+      <div class="stars-big" id="win-stars">★★★</div>
+      <p>দারুণ খেলেছো!</p>
+      <button class="btn btn-primary" id="btn-next-level">পরবর্তী লেভেল</button>
+      <button class="btn btn-secondary" id="btn-win-levels">লেভেল তালিকা</button>
+    </div>
+  </div>
+
+  <!-- LOSE MODAL -->
+  <div class="modal-bg hidden" id="modal-lose">
+    <div class="modal">
+      <div class="big-icon">💔</div>
+      <h2>হার্ট শেষ!</h2>
+      <p>আবার চেষ্টা করো</p>
+      <button class="btn btn-primary" id="btn-retry">আবার খেলো</button>
+      <button class="btn btn-secondary" id="btn-lose-levels">লেভেল তালিকা</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const TOTAL_LEVELS = 1000;
+  const STORAGE_KEY = "arrow_maze_save_v1";
+
+  /* ---------------- PRNG (seeded) ---------------- */
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function shuffle(arr, rng){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(rng()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  /* ---------------- Progress ---------------- */
+  function loadProgress(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    return { maxUnlocked: 1, stars: {} };
+  }
+  function saveProgress(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
+  let progress = loadProgress();
+
+  /* ---------------- Level config & generation ---------------- */
+  function getLevelConfig(level){
+    const size = Math.min(10, 5 + Math.floor((level-1)/70));
+    const density = Math.min(0.82, 0.45 + level*0.00035);
+    return { size, density };
+  }
+
+  const DIRS = ["up","down","left","right"];
+  const DELTA = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
+
+  function idxToRC(idx,size){ return [Math.floor(idx/size), idx%size]; }
+  function rcToIdx(r,c,size){ return r*size+c; }
+
+  function hasClearPath(idx, dir, size, occupiedSet){
+    let [r,c] = idxToRC(idx,size);
+    const [dr,dc] = DELTA[dir];
+    r+=dr; c+=dc;
+    while(r>=0 && r<size && c>=0 && c<size){
+      const i = rcToIdx(r,c,size);
+      if(occupiedSet.has(i)) return false;
+      r+=dr; c+=dc;
+    }
+    return true;
+  }
+
+  function generateLevel(level){
+    const cfg = getLevelConfig(level);
+    let size = cfg.size;
+    let count = Math.max(4, Math.round(size*size*cfg.density));
+    let attemptSeed = level*99991;
+
+    for(let outer=0; outer<60; outer++){
+      const rng = mulberry32(attemptSeed + outer*7919);
+      const allCells = shuffle([...Array(size*size).keys()], rng);
+      const solveOrder = allCells.slice(0, count); // p1..pN (p1 removed first)
+      const remaining = new Set();
+      const dirs = {};
+      let ok = true;
+
+      for(let i=solveOrder.length-1; i>=0; i--){
+        const cell = solveOrder[i];
+        const candidateDirs = shuffle(DIRS, rng);
+        let chosen = null;
+        for(const d of candidateDirs){
+          if(hasClearPath(cell, d, size, remaining)){ chosen = d; break; }
+        }
+        if(!chosen){ ok = false; break; }
+        dirs[cell] = chosen;
+        remaining.add(cell);
+      }
+
+      if(ok){
+        return { size, cells: dirs, total: solveOrder.length };
+      }
+      if(outer % 15 === 14 && count > 4) count--; // ease difficulty if repeatedly failing
+    }
+    // Extremely unlikely fallback: sparse guaranteed-solvable level
+    const size2 = Math.max(5,size);
+    const dirs2 = {}; dirs2[0] = "left"; dirs2[size2-1] = "right";
+    return { size: size2, cells: dirs2, total: 2 };
+  }
+
+  /* ---------------- Game state ---------------- */
+  let state = null; // { level, size, cells:{idx:dir}, active:Set, hearts, heartsLost, total, removed }
+
+  function startLevel(level){
+    const gen = generateLevel(level);
+    state = {
+      level, size: gen.size, cells: Object.assign({}, gen.cells),
+      active: new Set(Object.keys(gen.cells).map(Number)),
+      hearts: 5, heartsLost: 0, total: gen.total, removed: 0
+    };
+    document.getElementById("game-lvl-num").textContent = level;
+    renderHearts();
+    renderBoard();
+    showScreen("screen-game");
+  }
+
+  function renderHearts(){
+    const box = document.getElementById("hearts-box");
+    box.innerHTML = "";
+    for(let i=0;i<5;i++){
+      const s = document.createElement("span");
+      s.className = "heart" + (i < state.hearts ? " on" : "");
+      s.textContent = "♥";
+      box.appendChild(s);
+    }
+  }
+
+  const ARROW_SVG = '<svg viewBox="0 0 24 24"><path d="M12 2 L21 13 L15 13 L15 22 L9 22 L9 13 L3 13 Z" fill="currentColor"/></svg>';
+
+  function renderBoard(){
+    const board = document.getElementById("board");
+    board.innerHTML = "";
+    board.style.gridTemplateColumns = `repeat(${state.size}, 1fr)`;
+    board.style.gridTemplateRows = `repeat(${state.size}, 1fr)`;
+    for(let idx=0; idx<state.size*state.size; idx++){
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.dataset.idx = idx;
+      if(state.cells.hasOwnProperty(idx)){
+        const dir = state.cells[idx];
+        const arrow = document.createElement("div");
+        arrow.className = "arrow dir-" + dir;
+        arrow.innerHTML = ARROW_SVG;
+        arrow.dataset.idx = idx;
+        arrow.addEventListener("click", onArrowTap);
+        cell.appendChild(arrow);
+      } else {
+        cell.classList.add("empty");
+      }
+      board.appendChild(cell);
+    }
+  }
+
+  function onArrowTap(e){
+    const idx = Number(e.currentTarget.dataset.idx);
+    if(!state.active.has(idx)) return;
+    const dir = state.cells[idx];
+    const el = e.currentTarget;
+
+    if(hasClearPath(idx, dir, state.size, state.active)){
+      state.active.delete(idx);
+      state.removed++;
+      const dist = 220;
+      let tx=0, ty=0;
+      if(dir==="up") ty=-dist; else if(dir==="down") ty=dist;
+      else if(dir==="left") tx=-dist; else tx=dist;
+      el.style.transform = `translate(${tx}px, ${ty}px)`;
+      el.style.opacity = "0";
+      el.removeEventListener("click", onArrowTap);
+      setTimeout(()=>{ el.remove(); }, 260);
+
+      if(state.removed >= state.total){
+        setTimeout(winLevel, 320);
+      }
+    } else {
+      el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
+      loseHeart();
+    }
+  }
+
+  function loseHeart(){
+    state.hearts--; state.heartsLost++;
+    renderHearts();
+    if(state.hearts <= 0){
+      setTimeout(()=>{ document.getElementById("modal-lose").classList.remove("hidden"); }, 250);
+    }
+  }
+
+  function winLevel(){
+    let stars = 1;
+    if(state.heartsLost === 0) stars = 3;
+    else if(state.heartsLost <= 2) stars = 2;
+    progress.maxUnlocked = Math.max(progress.maxUnlocked, state.level + 1);
+    progress.stars[state.level] = Math.max(progress.stars[state.level]||0, stars);
+    saveProgress();
+    document.getElementById("win-stars").textContent = "★".repeat(stars) + "☆".repeat(3-stars);
+    document.getElementById("modal-win").classList.remove("hidden");
+  }
+
+  /* ---------------- Screens / navigation ---------------- */
+  function showScreen(id){
+    document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden"));
+    document.getElementById(id).classList.remove("hidden");
+  }
+
+  function buildLevelsGrid(){
+    const grid = document.getElementById("levels-grid");
+    grid.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    for(let lvl=1; lvl<=TOTAL_LEVELS; lvl++){
+      const btn = document.createElement("button");
+      const locked = lvl > progress.maxUnlocked;
+      btn.className = "lvl-btn" + (locked ? " locked" : "");
+      const stars = progress.stars[lvl] || 0;
+      btn.innerHTML = (locked ? "🔒" : lvl) +
+        (!locked ? `<div class="stars">${"★".repeat(stars)}${"☆".repeat(3-stars)}</div>` : "");
+      if(!locked){
+        btn.addEventListener("click", ()=>{ startLevel(lvl); });
+      }
+      frag.appendChild(btn);
+    }
+    grid.appendChild(frag);
+  }
+
+  function refreshMenu(){
+    document.getElementById("continue-lvl").textContent = progress.maxUnlocked;
+  }
+
+  /* ---------------- Event wiring ---------------- */
+  document.getElementById("btn-continue").addEventListener("click", ()=> startLevel(progress.maxUnlocked));
+  document.getElementById("btn-levels").addEventListener("click", ()=>{ buildLevelsGrid(); showScreen("screen-levels"); });
+  document.getElementById("btn-reset").addEventListener("click", ()=>{
+    if(confirm("সত্যিই সব প্রগ্রেস রিসেট করতে চাও?")){
+      progress = { maxUnlocked: 1, stars: {} };
+      saveProgress(); refreshMenu();
+    }
+  });
+  document.getElementById("back-from-levels").addEventListener("click", ()=>{ refreshMenu(); showScreen("screen-menu"); });
+  document.getElementById("back-from-game").addEventListener("click", ()=>{ refreshMenu(); showScreen("screen-menu"); });
+
+  document.getElementById("jump-go").addEventListener("click", ()=>{
+    const v = Number(document.getElementById("jump-input").value);
+    if(v>=1 && v<=TOTAL_LEVELS && v<=progress.maxUnlocked){ startLevel(v); }
+    else if(v>progress.maxUnlocked){ alert("এই লেভেলটি এখনো আনলক হয়নি!"); }
+  });
+
+  document.getElementById("btn-next-level").addEventListener("click", ()=>{
+    document.getElementById("modal-win").classList.add("hidden");
+    const next = state.level + 1;
+    if(next <= TOTAL_LEVELS) startLevel(next);
+    else { refreshMenu(); showScreen("screen-menu"); }
+  });
+  document.getElementById("btn-win-levels").addEventListener("click", ()=>{
+    document.getElementById("modal-win").classList.add("hidden");
+    buildLevelsGrid(); showScreen("screen-levels");
+  });
+  document.getElementById("btn-retry").addEventListener("click", ()=>{
+    document.getElementById("modal-lose").classList.add("hidden");
+    startLevel(state.level);
+  });
+  document.getElementById("btn-lose-levels").addEventListener("click", ()=>{
+    document.getElementById("modal-lose").classList.add("hidden");
+    buildLevelsGrid(); showScreen("screen-levels");
+  });
+
+  /* ---------------- Init ---------------- */
+  refreshMenu();
+  showScreen("screen-menu");
+})();
+</script>
+</body>
+</html>
+
+
